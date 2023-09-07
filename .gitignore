@@ -1,0 +1,3 @@
+venv/
+assets/*.pdf
+**/__pycache__

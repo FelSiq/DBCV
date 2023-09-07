@@ -1,0 +1,28 @@
+[build-system]
+build-backend = "flit_core.buildapi"
+requires = ["flit_core >=3.2,<4"]
+
+[tool.flit.module]
+name = "dbcv"
+
+[project]
+name = "dbcv"
+version = "0.1.0"
+description = "Fast implementation of DBCV metric."
+authors = [
+    {name="felsiq", email= "felipe.siqueira@usp.br"}
+]
+
+requires-python = ">=3.8"
+
+dependencies = [
+    "scipy >= 1.11.2",
+    "numpy >= 1.25.2",
+]
+
+[project.optional-dependencies]
+tests = [
+    "scikit-learn == 1.3.0",
+    "matplotlib == 3.7.2",
+    "tqdm == 4.66.1",
+]
