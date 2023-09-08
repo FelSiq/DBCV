@@ -77,8 +77,15 @@ def dbcv(X: npt.NDArray[np.float64], y: npt.NDArray[np.int32], metric: str = "sq
     X : npt.NDArray[np.float64] of shape (N, D)
         Data embeddings
 
-    Y : npt.NDArray[np.int32] of shape (N,)
+    y : npt.NDArray[np.int32] of shape (N,)
         Cluster assignments.
+
+    metric : str, default="sqeuclidean"
+        Metric function to compute dissimilarity between observations.
+        This argument is passed to `scipy.spatial.distance.cdist`.
+
+    noise_id : int, default=-1
+        Noise "cluster" ID.
 
     Returns
     -------
