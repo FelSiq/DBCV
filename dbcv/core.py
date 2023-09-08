@@ -3,6 +3,7 @@ import itertools
 
 import numpy as np
 import numpy.typing as npt
+import sklearn.neighbors
 import scipy.spatial.distance
 import scipy.sparse.csgraph
 import scipy.stats
@@ -10,6 +11,7 @@ import scipy.stats
 
 def compute_pair_to_pair_dists(X: npt.NDArray[np.float64], metric: str) -> npt.NDArray[np.float64]:
     dists = scipy.spatial.distance.cdist(X, X, metric=metric)
+    np.maximum(dists, 1e-12, out=dists)
     np.fill_diagonal(dists, val=np.inf)
     return dists
 
@@ -29,8 +31,16 @@ def get_internal_objects(mutual_reach_dists: npt.NDArray[np.float64]) -> npt.NDA
 
 
 def compute_cluster_core_distance(dists: npt.NDArray[np.float64], d: int) -> npt.NDArray[np.float64]:
-    n = len(dists)
+    n, m = dists.shape
+
+    if n == m and n > 800:
+        nn = sklearn.neighbors.NearestNeighbors(n_neighbors=801, metric="precomputed")
+        dists, _ = nn.fit(np.nan_to_num(dists, posinf=0.0)).kneighbors(return_distance=True)
+        dists = dists[:, 1:]
+        n = dists.shape[1]
+
     core_dists = np.power(dists, -d).sum(axis=-1, keepdims=True) / (n - 1 + 1e-12)
+    np.maximum(core_dists, 1e-12, out=core_dists)
     np.power(core_dists, -1.0 / d, out=core_dists)
     return core_dists
 
@@ -81,7 +91,11 @@ def dbcv(X: npt.NDArray[np.float64], y: npt.NDArray[np.int32], metric: str = "sq
           Ricardo J. G. B. Campello, Arthur Zimek, Jörg Sander.
           https://www.dbs.ifi.lmu.de/~zimek/publications/SDM2014/DBCV.pdf
     """
+    X = np.asfarray(X)
     X = np.atleast_2d(X)
+
+    y = np.asarray(y, dtype=int)
+
     n, d = X.shape  # NOTE: 'n' must be calculated before removing noise.
 
     non_noise_inds = y != noise_id
@@ -105,7 +119,7 @@ def dbcv(X: npt.NDArray[np.float64], y: npt.NDArray[np.int32], metric: str = "sq
     for cls_id in cluster_ids:
         cls_inds = np.flatnonzero(y == cls_id)
 
-        if cls_inds.size <= 2:
+        if cls_inds.size <= 3:
             internal_objects_per_cls[cls_id] = np.empty(0, dtype=int)
             dscs[cls_id] = 0.0
             continue
