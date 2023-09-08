@@ -116,7 +116,7 @@ def dbcv(
         Sample embeddings.
 
     y : npt.NDArray[np.int32] of shape (N,)
-        Cluster assignments.
+        Cluster IDs assigned for each sample in X.
 
     metric : str, default="sqeuclidean"
         Metric function to compute dissimilarity between observations.
@@ -147,6 +147,9 @@ def dbcv(
     y = np.asarray(y, dtype=int)
 
     n, d = X.shape  # NOTE: 'n' must be calculated before removing noise.
+
+    if n != y.size:
+        raise ValueError(f"Mismatch in {X.shape[0]=} and {y.size=} dimensions.")
 
     non_noise_inds = y != noise_id
     X = X[non_noise_inds, :]
