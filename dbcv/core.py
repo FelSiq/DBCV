@@ -172,7 +172,7 @@ def dbcv(
     cls_inds = [np.flatnonzero(y == cls_id) for cls_id in cluster_ids]
 
     if n_processes == "auto":
-        n_processes = 4 if y.size >= 200 else 1
+        n_processes = 4 if y.size > 200 else 1
 
     with multiprocessing.Pool(processes=min(n_processes, cluster_ids.size)) as ppool:
         fn_density_sparseness_ = functools.partial(fn_density_sparseness, d=d)
