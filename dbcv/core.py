@@ -156,7 +156,4 @@ def dbcv(X: npt.NDArray[np.float64], y: npt.NDArray[np.int32], metric: str = "sq
     np.nan_to_num(vcs, copy=False, nan=0.0)
     dbcv = float(np.sum(vcs * cluster_sizes)) / n
 
-    if np.isnan(dbcv):
-        print(min_dspcs, dscs, vcs, sep="\n", end="\n\n")
-
     return dbcv
