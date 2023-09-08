@@ -11,11 +11,12 @@ import dbcv
 def test():
     fig, axes = plt.subplots(2, 5, figsize=(12, 7), sharex=True, sharey=True, layout="tight")
     colors = ["black", "red", "blue"]
+    rng = np.random.RandomState(182)
 
     for i, noise in enumerate(np.linspace(0, 0.50, 10)):
         X, y = sklearn.datasets.make_moons(n_samples=300, noise=noise, random_state=1782)
 
-        X_noise = np.random.uniform(*(1.50 * np.quantile(X, (0, 1))), size=(30, 2))
+        X_noise = rng.uniform(*(1.50 * np.quantile(X, (0, 1))), size=(30, 2))
         y_noise = np.asarray([-1] * len(X_noise), dtype=int)
 
         dists, _ = sklearn.neighbors.NearestNeighbors(n_neighbors=1).fit(X).kneighbors(X_noise)
