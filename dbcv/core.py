@@ -1,5 +1,7 @@
+import multiprocessing
 import typing as t
 import itertools
+import functools
 
 import numpy as np
 import numpy.typing as npt
@@ -16,6 +18,17 @@ def compute_pair_to_pair_dists(X: npt.NDArray[np.float64], metric: str) -> npt.N
     return dists
 
 
+def get_subarray(
+    arr: npt.NDArray[np.float64],
+    /,
+    inds_a: t.Optional[npt.NDArray[np.int32]] = None,
+    inds_b: t.Optional[npt.NDArray[np.int32]] = None,
+) -> npt.NDArray[np.float64]:
+    if inds_a is None: return arr
+    if inds_b is None: inds_b = inds_a
+    return arr[*np.meshgrid(inds_a, inds_b)]
+
+
 def get_internal_objects(mutual_reach_dists: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     mst = scipy.sparse.csgraph.minimum_spanning_tree(mutual_reach_dists)
     mst = mst.toarray()
@@ -25,7 +38,7 @@ def get_internal_objects(mutual_reach_dists: npt.NDArray[np.float64]) -> npt.NDA
     internal_node_inds = (is_mst_edges + is_mst_edges.T).sum(axis=0) > 1
     internal_node_inds = np.flatnonzero(internal_node_inds)
 
-    internal_edge_weights = mst[*np.meshgrid(internal_node_inds, internal_node_inds)]
+    internal_edge_weights = get_subarray(mst, inds_a=internal_node_inds)
 
     return internal_node_inds, internal_edge_weights
 
@@ -48,15 +61,16 @@ def compute_cluster_core_distance(dists: npt.NDArray[np.float64], d: int) -> npt
 def compute_mutual_reach_dists(
     dists: npt.NDArray[np.float64],
     d: float,
-    cls_inds_a: npt.NDArray[np.int32],
+    cls_inds_a: t.Optional[npt.NDArray[np.int32]] = None,
     cls_inds_b: t.Optional[npt.NDArray[np.int32]] = None,
+    is_symmetric: bool = False,
 ) -> npt.NDArray[np.float64]:
-    if cls_inds_b is None:
-        cls_dists = dists[*np.meshgrid(cls_inds_a, cls_inds_a)]
+    cls_dists = get_subarray(dists, inds_a=cls_inds_a, inds_b=cls_inds_b)
+
+    if is_symmetric:
         core_dists_a = core_dists_b = compute_cluster_core_distance(d=d, dists=cls_dists)
 
     else:
-        cls_dists = dists[*np.meshgrid(cls_inds_a, cls_inds_b)]
         core_dists_a = compute_cluster_core_distance(d=d, dists=cls_dists)
         core_dists_b = compute_cluster_core_distance(d=d, dists=cls_dists.T).T
 
@@ -67,15 +81,39 @@ def compute_mutual_reach_dists(
     return mutual_reach_dists
 
 
-def dbcv(X: npt.NDArray[np.float64], y: npt.NDArray[np.int32], metric: str = "sqeuclidean", noise_id: int = -1) -> float:
+def fn_density_sparseness(
+    cls_inds: npt.NDArray[np.int32], dists: npt.NDArray[np.float64], d: int
+) -> tuple[float, npt.NDArray[np.int32]]:
+    if cls_inds.size <= 3:
+        return (0.0, np.empty(0, dtype=int))
+
+    mutual_reach_dists = compute_mutual_reach_dists(dists=dists, d=d, is_symmetric=True)
+    internal_node_inds, internal_edge_weights = get_internal_objects(mutual_reach_dists)
+
+    dsc = float(internal_edge_weights.max())
+    internal_node_inds = cls_inds[internal_node_inds]
+
+    return (dsc, internal_node_inds)
+
+
+def fn_density_separation(cls_i: int, cls_j: int, dists: npt.NDArray[np.float64], d: int) -> tuple[int, int, float]:
+    mutual_reach_dists = compute_mutual_reach_dists(dists=dists, d=d, is_symmetric=False)
+    dspc_ij = float(mutual_reach_dists.min()) if mutual_reach_dists.size else np.inf
+    return (cls_i, cls_j, dspc_ij)
+
+
+def dbcv(
+    X: npt.NDArray[np.float64], y: npt.NDArray[np.int32], metric: str = "sqeuclidean", noise_id: int = -1, n_processes: int = 4
+) -> float:
     """Compute DBCV metric.
 
-    DBCV is an intrinsic (= unsupervised/unlabeled) relative metric.
+    Density-Based Clustering Validation (DBCV) is an intrinsic (= unsupervised/unlabeled)
+    relative metric. See [1] for the original reference.
 
     Parameters
     ----------
     X : npt.NDArray[np.float64] of shape (N, D)
-        Data embeddings
+        Sample embeddings.
 
     y : npt.NDArray[np.int32] of shape (N,)
         Cluster assignments.
@@ -87,6 +125,11 @@ def dbcv(X: npt.NDArray[np.float64], y: npt.NDArray[np.int32], metric: str = "sq
     noise_id : int, default=-1
         Noise "cluster" ID.
 
+    n_processes : int or "auto", default="auto"
+        Maximum number of parallel processes for processing clusters and cluster pairs.
+        If `n_processes="auto"`, the number of parallel processes will be set to 1 for
+        datasets with 200 or fewer instances, and 4 for datasets with more than 200 instances.
+
     Returns
     -------
     DBCV : float
@@ -94,9 +137,9 @@ def dbcv(X: npt.NDArray[np.float64], y: npt.NDArray[np.int32], metric: str = "sq
 
     Source
     ------
-    ..[1] "Density-Based Clustering Validation". Davoud Moulavi, Pablo A. Jaskowiak,
-          Ricardo J. G. B. Campello, Arthur Zimek, Jörg Sander.
-          https://www.dbs.ifi.lmu.de/~zimek/publications/SDM2014/DBCV.pdf
+    .. [1] "Density-Based Clustering Validation". Davoud Moulavi, Pablo A. Jaskowiak,
+           Ricardo J. G. B. Campello, Arthur Zimek, Jörg Sander.
+           https://www.dbs.ifi.lmu.de/~zimek/publications/SDM2014/DBCV.pdf
     """
     X = np.asfarray(X)
     X = np.atleast_2d(X)
@@ -123,34 +166,31 @@ def dbcv(X: npt.NDArray[np.float64], y: npt.NDArray[np.int32], metric: str = "sq
     # Internal objects = Internal nodes = nodes such that degree(node) > 1 in MST.
     internal_objects_per_cls: dict[int, npt.NDArray[np.int32]] = {}
 
-    for cls_id in cluster_ids:
-        cls_inds = np.flatnonzero(y == cls_id)
+    cls_inds = [np.flatnonzero(y == cls_id) for cls_id in cluster_ids]
 
-        if cls_inds.size <= 3:
-            internal_objects_per_cls[cls_id] = np.empty(0, dtype=int)
-            dscs[cls_id] = 0.0
-            continue
+    if n_processes == "auto":
+        n_processes = 4 if y.size >= 200 else 1
 
-        mutual_reach_dists = compute_mutual_reach_dists(dists=dists, d=d, cls_inds_a=cls_inds)
-        internal_node_inds, internal_edge_weights = get_internal_objects(mutual_reach_dists)
+    with multiprocessing.Pool(processes=min(n_processes, cluster_ids.size)) as ppool:
+        fn_density_sparseness_ = functools.partial(fn_density_sparseness, d=d)
+        args = [(cls_ind, get_subarray(dists, inds_a=cls_ind)) for cls_ind in cls_inds]
+        for cls_id, (dsc, internal_node_inds) in enumerate(ppool.starmap(fn_density_sparseness_, args)):
+            internal_objects_per_cls[cls_id] = internal_node_inds
+            dscs[cls_id] = dsc
 
-        internal_objects_per_cls[cls_id] = cls_inds[internal_node_inds]
-        dscs[cls_id] = float(internal_edge_weights.max())
+    n_cls_pairs = (cluster_ids.size * (cluster_ids.size - 1)) // 2
 
-    for cls_i, cls_j in itertools.combinations(cluster_ids, 2):
-        mutual_reach_dists = compute_mutual_reach_dists(
-            dists=dists,
-            d=d,
-            cls_inds_a=internal_objects_per_cls[cls_i],
-            cls_inds_b=internal_objects_per_cls[cls_j],
-        )
+    with multiprocessing.Pool(processes=min(n_processes, n_cls_pairs)) as ppool:
+        fn_density_separation_ = functools.partial(fn_density_separation, d=d)
 
-        if mutual_reach_dists.size == 0:
-            continue
+        args = [
+            (cls_i, cls_j, get_subarray(dists, internal_objects_per_cls[cls_i], internal_objects_per_cls[cls_j]))
+            for cls_i, cls_j in itertools.combinations(cluster_ids, 2)
+        ]
 
-        dspc_ij = float(mutual_reach_dists.min())
-        min_dspcs[cls_i] = min(min_dspcs[cls_i], dspc_ij)
-        min_dspcs[cls_j] = min(min_dspcs[cls_j], dspc_ij)
+        for cls_i, cls_j, dspc_ij in ppool.starmap(fn_density_separation_, args):
+            min_dspcs[cls_i] = min(min_dspcs[cls_i], dspc_ij)
+            min_dspcs[cls_j] = min(min_dspcs[cls_j], dspc_ij)
 
     vcs = (min_dspcs - dscs) / (1e-12 + np.maximum(min_dspcs, dscs))
     np.nan_to_num(vcs, copy=False, nan=0.0)
