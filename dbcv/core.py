@@ -105,8 +105,22 @@ def fn_density_separation(cls_i: int, cls_j: int, dists: npt.NDArray[np.float64]
     return (cls_i, cls_j, dspc_ij)
 
 
+def _check_duplicated_samples(X: npt.NDArray[np.float64], threshold: float = 1e-9):
+    nn = sklearn.neighbors.NearestNeighbors(n_neighbors=1)
+    nn.fit(X)
+    dists, _ = nn.kneighbors(return_distance=True)
+
+    if np.any(dists < threshold):
+        raise ValueError("Duplicated samples have been found in X.")
+
+
 def dbcv(
-    X: npt.NDArray[np.float64], y: npt.NDArray[np.int32], metric: str = "sqeuclidean", noise_id: int = -1, n_processes: int = 4
+    X: npt.NDArray[np.float64],
+    y: npt.NDArray[np.int32],
+    metric: str = "sqeuclidean",
+    noise_id: int = -1,
+    check_duplicates: bool = True,
+    n_processes: int = 4,
 ) -> float:
     """Compute DBCV metric.
 
@@ -127,6 +141,9 @@ def dbcv(
 
     noise_id : int, default=-1
         Noise "cluster" ID.
+
+    check_duplicates : bool, default=True
+        If True, check for duplicated samples.
 
     n_processes : int or "auto", default="auto"
         Maximum number of parallel processes for processing clusters and cluster pairs.
@@ -160,6 +177,9 @@ def dbcv(
 
     y = scipy.stats.rankdata(y, method="dense") - 1
     cluster_ids, cluster_sizes = np.unique(y, return_counts=True)
+
+    if check_duplicates:
+        _check_duplicated_samples(X)
 
     dists = compute_pair_to_pair_dists(X=X, metric=metric)
 
