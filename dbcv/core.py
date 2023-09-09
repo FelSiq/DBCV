@@ -2,6 +2,7 @@ import multiprocessing
 import typing as t
 import itertools
 import functools
+import warnings
 
 import numpy as np
 import numpy.typing as npt
@@ -49,12 +50,14 @@ def compute_cluster_core_distance(dists: npt.NDArray[np.float64], d: int) -> npt
     if n == m and n > 800:
         nn = sklearn.neighbors.NearestNeighbors(n_neighbors=801, metric="precomputed")
         dists, _ = nn.fit(np.nan_to_num(dists, posinf=0.0)).kneighbors(return_distance=True)
-        dists = dists[:, 1:]
         n = dists.shape[1]
 
-    core_dists = np.power(dists, -d).sum(axis=-1, keepdims=True) / (n - 1 + 1e-12)
-    np.maximum(core_dists, 1e-12, out=core_dists)
-    np.power(core_dists, -1.0 / d, out=core_dists)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=RuntimeWarning)
+        core_dists = np.power(dists, -d).sum(axis=-1, keepdims=True) / (n - 1 + 1e-12)
+        np.clip(core_dists, a_min=1e-12, a_max=1e+12, out=core_dists)
+        np.power(core_dists, -1.0 / d, out=core_dists)
+
     return core_dists
 
 
@@ -195,6 +198,7 @@ def dbcv(
             min_dspcs[cls_i] = min(min_dspcs[cls_i], dspc_ij)
             min_dspcs[cls_j] = min(min_dspcs[cls_j], dspc_ij)
 
+    np.nan_to_num(min_dspcs, copy=False, posinf=1e+12)
     vcs = (min_dspcs - dscs) / (1e-12 + np.maximum(min_dspcs, dscs))
     np.nan_to_num(vcs, copy=False, nan=0.0)
     dbcv = float(np.sum(vcs * cluster_sizes)) / n
