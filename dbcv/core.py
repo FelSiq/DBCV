@@ -12,6 +12,9 @@ import scipy.stats
 import mpmath
 
 
+_MP = mpmath.mp.clone()
+
+
 def compute_pair_to_pair_dists(X: npt.NDArray[np.float64], metric: str) -> npt.NDArray[np.float64]:
     dists = scipy.spatial.distance.cdist(X, X, metric=metric)
     np.maximum(dists, 1e-12, out=dists)
@@ -59,7 +62,7 @@ def compute_cluster_core_distance(
     orig_dists_dtype = dists.dtype
 
     if enable_dynamic_precision:
-        dists = np.asarray(mpmath.matrix(dists), dtype=object).reshape(*dists.shape)
+        dists = np.asarray(_MP.matrix(dists), dtype=object).reshape(*dists.shape)
 
     core_dists = np.power(dists, -d).sum(axis=-1, keepdims=True) / (n - 1 + 1e-12)
 
@@ -149,7 +152,7 @@ def dbcv(
     check_duplicates: bool = True,
     n_processes: int = 4,
     enable_dynamic_precision: bool = False,
-    bits_of_precision: int = 256,
+    bits_of_precision: int = 512,
 ) -> float:
     """Compute DBCV metric.
 
@@ -185,7 +188,7 @@ def dbcv(
         This argument enables proper density calculation for very high dimensional data,
         although it is much slower than the standard calculations.
 
-    bits_of_precision : int, default=256
+    bits_of_precision : int, default=512
         Bits of precision for density calculation. High values are necessary for high
         dimensions to avoid underflow/overflow.
 
@@ -233,14 +236,10 @@ def dbcv(
 
     cls_inds = [np.flatnonzero(y == cls_id) for cls_id in cluster_ids]
 
-    if enable_dynamic_precision:
-        _MPMATH_PRECISION = mpmath.mp.prec  # NOTE: save current precision since it's a global configuration.
-        mpmath.mp.prec = 256  # NOTE: in bits.
-
     if n_processes == "auto":
         n_processes = 4 if y.size > 200 else 1
 
-    with multiprocessing.Pool(processes=min(n_processes, cluster_ids.size)) as ppool:
+    with _MP.workprec(bits_of_precision), multiprocessing.Pool(processes=min(n_processes, cluster_ids.size)) as ppool:
         fn_density_sparseness_ = functools.partial(
             fn_density_sparseness,
             d=d,
@@ -255,7 +254,7 @@ def dbcv(
 
     n_cls_pairs = (cluster_ids.size * (cluster_ids.size - 1)) // 2
 
-    with multiprocessing.Pool(processes=min(n_processes, n_cls_pairs)) as ppool:
+    with _MP.workprec(bits_of_precision), multiprocessing.Pool(processes=min(n_processes, n_cls_pairs)) as ppool:
         fn_density_separation_ = functools.partial(
             fn_density_separation,
             d=d,
@@ -275,8 +274,5 @@ def dbcv(
     vcs = (min_dspcs - dscs) / (1e-12 + np.maximum(min_dspcs, dscs))
     np.nan_to_num(vcs, copy=False, nan=0.0)
     dbcv = float(np.sum(vcs * cluster_sizes)) / n
-
-    if enable_dynamic_precision:
-        mpmath.mp.prec = _MPMATH_PRECISION
 
     return dbcv
