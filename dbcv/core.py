@@ -2,7 +2,6 @@ import multiprocessing
 import typing as t
 import itertools
 import functools
-import warnings
 
 import numpy as np
 import numpy.typing as npt
@@ -10,6 +9,7 @@ import sklearn.neighbors
 import scipy.spatial.distance
 import scipy.sparse.csgraph
 import scipy.stats
+import mpmath
 
 
 def compute_pair_to_pair_dists(X: npt.NDArray[np.float64], metric: str) -> npt.NDArray[np.float64]:
@@ -25,8 +25,10 @@ def get_subarray(
     inds_a: t.Optional[npt.NDArray[np.int32]] = None,
     inds_b: t.Optional[npt.NDArray[np.int32]] = None,
 ) -> npt.NDArray[np.float64]:
-    if inds_a is None: return arr
-    if inds_b is None: inds_b = inds_a
+    if inds_a is None:
+        return arr
+    if inds_b is None:
+        inds_b = inds_a
     return arr[*np.meshgrid(inds_a, inds_b)]
 
 
@@ -44,7 +46,9 @@ def get_internal_objects(mutual_reach_dists: npt.NDArray[np.float64]) -> npt.NDA
     return internal_node_inds, internal_edge_weights
 
 
-def compute_cluster_core_distance(dists: npt.NDArray[np.float64], d: int) -> npt.NDArray[np.float64]:
+def compute_cluster_core_distance(
+    dists: npt.NDArray[np.float64], d: int, enable_dynamic_precision: bool
+) -> npt.NDArray[np.float64]:
     n, m = dists.shape
 
     if n == m and n > 800:
@@ -52,11 +56,20 @@ def compute_cluster_core_distance(dists: npt.NDArray[np.float64], d: int) -> npt
         dists, _ = nn.fit(np.nan_to_num(dists, posinf=0.0)).kneighbors(return_distance=True)
         n = dists.shape[1]
 
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=RuntimeWarning)
-        core_dists = np.power(dists, -d).sum(axis=-1, keepdims=True) / (n - 1 + 1e-12)
-        np.clip(core_dists, a_min=1e-12, a_max=1e+12, out=core_dists)
-        np.power(core_dists, -1.0 / d, out=core_dists)
+    orig_dists_dtype = dists.dtype
+
+    if enable_dynamic_precision:
+        dists = np.asarray(mpmath.matrix(dists), dtype=object).reshape(*dists.shape)
+
+    core_dists = np.power(dists, -d).sum(axis=-1, keepdims=True) / (n - 1 + 1e-12)
+
+    if not enable_dynamic_precision:
+        np.clip(core_dists, a_min=1e-12, a_max=1e12, out=core_dists)
+
+    np.power(core_dists, -1.0 / d, out=core_dists)
+
+    if enable_dynamic_precision:
+        core_dists = np.asfarray(core_dists, dtype=orig_dists_dtype)
 
     return core_dists
 
@@ -64,18 +77,23 @@ def compute_cluster_core_distance(dists: npt.NDArray[np.float64], d: int) -> npt
 def compute_mutual_reach_dists(
     dists: npt.NDArray[np.float64],
     d: float,
+    enable_dynamic_precision: bool,
+    is_symmetric: bool,
     cls_inds_a: t.Optional[npt.NDArray[np.int32]] = None,
     cls_inds_b: t.Optional[npt.NDArray[np.int32]] = None,
-    is_symmetric: bool = False,
 ) -> npt.NDArray[np.float64]:
     cls_dists = get_subarray(dists, inds_a=cls_inds_a, inds_b=cls_inds_b)
 
     if is_symmetric:
-        core_dists_a = core_dists_b = compute_cluster_core_distance(d=d, dists=cls_dists)
+        core_dists_a = core_dists_b = compute_cluster_core_distance(
+            d=d, dists=cls_dists, enable_dynamic_precision=enable_dynamic_precision
+        )
 
     else:
-        core_dists_a = compute_cluster_core_distance(d=d, dists=cls_dists)
-        core_dists_b = compute_cluster_core_distance(d=d, dists=cls_dists.T).T
+        core_dists_a = compute_cluster_core_distance(d=d, dists=cls_dists, enable_dynamic_precision=enable_dynamic_precision)
+        core_dists_b = compute_cluster_core_distance(
+            d=d, dists=cls_dists.T, enable_dynamic_precision=enable_dynamic_precision
+        ).T
 
     mutual_reach_dists = cls_dists.copy()
     np.maximum(mutual_reach_dists, core_dists_a, out=mutual_reach_dists)
@@ -85,12 +103,17 @@ def compute_mutual_reach_dists(
 
 
 def fn_density_sparseness(
-    cls_inds: npt.NDArray[np.int32], dists: npt.NDArray[np.float64], d: int
+    cls_inds: npt.NDArray[np.int32],
+    dists: npt.NDArray[np.float64],
+    d: int,
+    enable_dynamic_precision: bool,
 ) -> tuple[float, npt.NDArray[np.int32]]:
     if cls_inds.size <= 3:
         return (0.0, np.empty(0, dtype=int))
 
-    mutual_reach_dists = compute_mutual_reach_dists(dists=dists, d=d, is_symmetric=True)
+    mutual_reach_dists = compute_mutual_reach_dists(
+        dists=dists, d=d, is_symmetric=True, enable_dynamic_precision=enable_dynamic_precision
+    )
     internal_node_inds, internal_edge_weights = get_internal_objects(mutual_reach_dists)
 
     dsc = float(internal_edge_weights.max())
@@ -99,8 +122,12 @@ def fn_density_sparseness(
     return (dsc, internal_node_inds)
 
 
-def fn_density_separation(cls_i: int, cls_j: int, dists: npt.NDArray[np.float64], d: int) -> tuple[int, int, float]:
-    mutual_reach_dists = compute_mutual_reach_dists(dists=dists, d=d, is_symmetric=False)
+def fn_density_separation(
+    cls_i: int, cls_j: int, dists: npt.NDArray[np.float64], d: int, enable_dynamic_precision: bool
+) -> tuple[int, int, float]:
+    mutual_reach_dists = compute_mutual_reach_dists(
+        dists=dists, d=d, is_symmetric=False, enable_dynamic_precision=enable_dynamic_precision
+    )
     dspc_ij = float(mutual_reach_dists.min()) if mutual_reach_dists.size else np.inf
     return (cls_i, cls_j, dspc_ij)
 
@@ -121,6 +148,8 @@ def dbcv(
     noise_id: int = -1,
     check_duplicates: bool = True,
     n_processes: int = 4,
+    enable_dynamic_precision: bool = False,
+    bits_of_precision: int = 256,
 ) -> float:
     """Compute DBCV metric.
 
@@ -149,6 +178,16 @@ def dbcv(
         Maximum number of parallel processes for processing clusters and cluster pairs.
         If `n_processes="auto"`, the number of parallel processes will be set to 1 for
         datasets with 200 or fewer instances, and 4 for datasets with more than 200 instances.
+
+    enable_dynamic_precision : bool, default=False
+        If True, activate dynamic quantity of bits of precision for floating point
+        during density calculation, as defined by `bits_of_precision` argument below.
+        This argument enables proper density calculation for very high dimensional data,
+        although it is much slower than the standard calculations.
+
+    bits_of_precision : int, default=256
+        Bits of precision for density calculation. High values are necessary for high
+        dimensions to avoid underflow/overflow.
 
     Returns
     -------
@@ -194,12 +233,22 @@ def dbcv(
 
     cls_inds = [np.flatnonzero(y == cls_id) for cls_id in cluster_ids]
 
+    if enable_dynamic_precision:
+        _MPMATH_PRECISION = mpmath.mp.prec  # NOTE: save current precision since it's a global configuration.
+        mpmath.mp.prec = 256  # NOTE: in bits.
+
     if n_processes == "auto":
         n_processes = 4 if y.size > 200 else 1
 
     with multiprocessing.Pool(processes=min(n_processes, cluster_ids.size)) as ppool:
-        fn_density_sparseness_ = functools.partial(fn_density_sparseness, d=d)
+        fn_density_sparseness_ = functools.partial(
+            fn_density_sparseness,
+            d=d,
+            enable_dynamic_precision=enable_dynamic_precision,
+        )
+
         args = [(cls_ind, get_subarray(dists, inds_a=cls_ind)) for cls_ind in cls_inds]
+
         for cls_id, (dsc, internal_node_inds) in enumerate(ppool.starmap(fn_density_sparseness_, args)):
             internal_objects_per_cls[cls_id] = internal_node_inds
             dscs[cls_id] = dsc
@@ -207,7 +256,11 @@ def dbcv(
     n_cls_pairs = (cluster_ids.size * (cluster_ids.size - 1)) // 2
 
     with multiprocessing.Pool(processes=min(n_processes, n_cls_pairs)) as ppool:
-        fn_density_separation_ = functools.partial(fn_density_separation, d=d)
+        fn_density_separation_ = functools.partial(
+            fn_density_separation,
+            d=d,
+            enable_dynamic_precision=enable_dynamic_precision,
+        )
 
         args = [
             (cls_i, cls_j, get_subarray(dists, internal_objects_per_cls[cls_i], internal_objects_per_cls[cls_j]))
@@ -218,9 +271,12 @@ def dbcv(
             min_dspcs[cls_i] = min(min_dspcs[cls_i], dspc_ij)
             min_dspcs[cls_j] = min(min_dspcs[cls_j], dspc_ij)
 
-    np.nan_to_num(min_dspcs, copy=False, posinf=1e+12)
+    np.nan_to_num(min_dspcs, copy=False, posinf=1e12)
     vcs = (min_dspcs - dscs) / (1e-12 + np.maximum(min_dspcs, dscs))
     np.nan_to_num(vcs, copy=False, nan=0.0)
     dbcv = float(np.sum(vcs * cluster_sizes)) / n
+
+    if enable_dynamic_precision:
+        mpmath.mp.prec = _MPMATH_PRECISION
 
     return dbcv
