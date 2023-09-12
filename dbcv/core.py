@@ -217,6 +217,9 @@ def dbcv(
     X = X[non_noise_inds, :]
     y = y[non_noise_inds]
 
+    if y.size == 0:
+        return 0.0
+
     y = scipy.stats.rankdata(y, method="dense") - 1
     cluster_ids, cluster_sizes = np.unique(y, return_counts=True)
 
@@ -254,21 +257,22 @@ def dbcv(
 
     n_cls_pairs = (cluster_ids.size * (cluster_ids.size - 1)) // 2
 
-    with _MP.workprec(bits_of_precision), multiprocessing.Pool(processes=min(n_processes, n_cls_pairs)) as ppool:
-        fn_density_separation_ = functools.partial(
-            fn_density_separation,
-            d=d,
-            enable_dynamic_precision=enable_dynamic_precision,
-        )
+    if n_cls_pairs > 0:
+        with _MP.workprec(bits_of_precision), multiprocessing.Pool(processes=min(n_processes, n_cls_pairs)) as ppool:
+            fn_density_separation_ = functools.partial(
+                fn_density_separation,
+                d=d,
+                enable_dynamic_precision=enable_dynamic_precision,
+            )
 
-        args = [
-            (cls_i, cls_j, get_subarray(dists, internal_objects_per_cls[cls_i], internal_objects_per_cls[cls_j]))
-            for cls_i, cls_j in itertools.combinations(cluster_ids, 2)
-        ]
+            args = [
+                (cls_i, cls_j, get_subarray(dists, internal_objects_per_cls[cls_i], internal_objects_per_cls[cls_j]))
+                for cls_i, cls_j in itertools.combinations(cluster_ids, 2)
+            ]
 
-        for cls_i, cls_j, dspc_ij in ppool.starmap(fn_density_separation_, args):
-            min_dspcs[cls_i] = min(min_dspcs[cls_i], dspc_ij)
-            min_dspcs[cls_j] = min(min_dspcs[cls_j], dspc_ij)
+            for cls_i, cls_j, dspc_ij in ppool.starmap(fn_density_separation_, args):
+                min_dspcs[cls_i] = min(min_dspcs[cls_i], dspc_ij)
+                min_dspcs[cls_j] = min(min_dspcs[cls_j], dspc_ij)
 
     np.nan_to_num(min_dspcs, copy=False, posinf=1e12)
     vcs = (min_dspcs - dscs) / (1e-12 + np.maximum(min_dspcs, dscs))
