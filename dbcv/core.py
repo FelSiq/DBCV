@@ -136,6 +136,9 @@ def fn_density_separation(
 
 
 def _check_duplicated_samples(X: npt.NDArray[np.float64], threshold: float = 1e-9):
+    if X.shape[0] <= 1:
+        return
+
     nn = sklearn.neighbors.NearestNeighbors(n_neighbors=1)
     nn.fit(X)
     dists, _ = nn.kneighbors(return_distance=True)
