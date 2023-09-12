@@ -207,7 +207,9 @@ def dbcv(
            https://www.dbs.ifi.lmu.de/~zimek/publications/SDM2014/DBCV.pdf
     """
     X = np.asfarray(X)
-    X = np.atleast_2d(X)
+
+    if X.ndim == 1:
+        X = X.reshape(-1, 1)
 
     y = np.asarray(y, dtype=int)
 
