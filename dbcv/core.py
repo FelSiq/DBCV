@@ -32,7 +32,8 @@ def get_subarray(
         return arr
     if inds_b is None:
         inds_b = inds_a
-    return arr[*np.meshgrid(inds_a, inds_b)]
+    inds_a_mesh, inds_b_mesh = np.meshgrid(inds_a, inds_b)
+    return arr[inds_a_mesh, inds_b_mesh]
 
 
 def get_internal_objects(mutual_reach_dists: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
