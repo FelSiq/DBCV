@@ -76,7 +76,7 @@ print(score)
 
 ### High precision computation
 
-If you are facing underflow issues and need more precision bits, you can adjust how many are available dynamically by enabling `dbcv.dbcv(..., enable_dynamic_precision=True)`. You can control the number of precision bits available by setting `dbcv.dbcv(..., enable_dynamic_precision=True, bits_of_precision=n)`.
+If you are facing underflow issues and need more precision bits, you can dynamically adjust how many are available by enabling `dbcv.dbcv(..., enable_dynamic_precision=True)`. The number of precision bits available is controlled by `dbcv.dbcv(..., enable_dynamic_precision=True, bits_of_precision=n)`.
 
 ```python
 import dbcv
