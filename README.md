@@ -47,20 +47,21 @@ import dbcv
 
 X, y = sklearn.datasets.make_moons(n_samples=500, noise=0.10, random_state=1782)
 
-noise_id = -1
-# NOTE: dbcv.dbcv(..., noise_id=-1) by default; you don't have to set this up.
+noise_id = -1  # NOTE: dbcv.dbcv(..., noise_id=-1) by default.
 
 rng = np.random.RandomState(1082)
 X_noise = rng.uniform(*np.quantile(X, (0, 1), axis=0), size=(100, 2))
 y_noise = 100 * [noise_id]
 
-score = dbcv.dbcv(np.vstack((X, X_noise)), np.hstack((y, y_noise)), noise_id=noise_id)
+X, y = np.vstack((X, X_noise)), np.hstack((y, y_noise))
+
+score = dbcv.dbcv(X, y, noise_id=noise_id)
 print(score)
 # 0.8072520501068048
 ```
 
 ### Multiprocessing
-You can use the `dbcv.dbcv(..., n_processes=n)` argument to specify the number of parallel processes during computations. The default value of `n_processes` is set to `"auto"`. If `n_processes="auto"`, the number of parallel processes will be set to 1 for datasets with 200 or fewer instances, and 4 for datasets with more than 200 instances.
+You can use the `dbcv.dbcv(..., n_processes=n)` argument to specify the number of parallel processes during computations. The default value of `n_processes` is `"auto"`, which is equivalent to 1 for datasets with 200 or fewer instances, and 4 for datasets with more than 200 instances.
 
 ```python
 import dbcv
@@ -75,7 +76,7 @@ print(score)
 
 ### High precision computation
 
-If you need more precision bits, you can adjust them dynamically by enabling `dbcv.dbcv(..., enable_dynamic_precision=True)`. You can control the number of precision bits available by setting `dbcv.dbcv(..., enable_dynamic_precision=True, bits_of_precision=n)`.
+If you are facing underflow issues and need more precision bits, you can adjust how many are available dynamically by enabling `dbcv.dbcv(..., enable_dynamic_precision=True)`. You can control the number of precision bits available by setting `dbcv.dbcv(..., enable_dynamic_precision=True, bits_of_precision=n)`.
 
 ```python
 import dbcv
@@ -88,7 +89,7 @@ print(score)
 # 0.978017974682571
 ```
 
-Note that enabling this option will make the DBCV calculation much slower than the plain numpy/scipy version, as shown in the comparison table below, which displays runtimes collected by computing DBCV on an dataset of shape (10,000, 784) twenty times in a row. However, this option may be necessary, especially for computing DBCV in very high dimensions.
+Note that enabling this option makes the DBCV calculation much slower than the plain numpy/scipy version. However, this option may be necessary for computing DBCV in high dimensions, since density calculations easily underflow under that circumstance. The table below displays runtimes from computing DBCV on an dataset of shape (10,000, 784) twenty times in a row for variable amount of precision bits and for dynamic precision disabled.
 
 Bits           | Runtime mean ± std (slowdown w.r.t. 'Off') |
 :--            | :--                             |
