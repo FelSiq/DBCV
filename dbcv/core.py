@@ -180,6 +180,8 @@ def dbcv(
 
     check_duplicates : bool, default=True
         If True, check for duplicated samples.
+        Instances with Euclidean distance to their nearest neighbor below 1e-9 are considered
+        duplicates.
 
     n_processes : int or "auto", default="auto"
         Maximum number of parallel processes for processing clusters and cluster pairs.
