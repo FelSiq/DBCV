@@ -33,14 +33,14 @@ def get_subarray(
     if inds_b is None:
         inds_b = inds_a
     inds_a_mesh, inds_b_mesh = np.meshgrid(inds_a, inds_b)
-    return arr[inds_a_mesh, inds_b_mesh]
+    return arr[inds_a_mesh, inds_b_mesh].T
 
 
 def get_internal_objects(mutual_reach_dists: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     mst = scipy.sparse.csgraph.minimum_spanning_tree(mutual_reach_dists)
     mst = mst.toarray()
 
-    is_mst_edges = mst > 0.0
+    is_mst_edges = (mst > 0.0).astype(int, copy=False)
 
     internal_node_inds = (is_mst_edges + is_mst_edges.T).sum(axis=0) > 1
     internal_node_inds = np.flatnonzero(internal_node_inds)
@@ -92,6 +92,7 @@ def compute_mutual_reach_dists(
         core_dists_a = core_dists_b = compute_cluster_core_distance(
             d=d, dists=cls_dists, enable_dynamic_precision=enable_dynamic_precision
         )
+        core_dists_b = core_dists_b.T
 
     else:
         core_dists_a = compute_cluster_core_distance(d=d, dists=cls_dists, enable_dynamic_precision=enable_dynamic_precision)
@@ -237,7 +238,7 @@ def dbcv(
     dists = compute_pair_to_pair_dists(X=X, metric=metric)
 
     # DSC: 'Density Sparseness of a Cluster'
-    dscs = np.empty(cluster_ids.size, dtype=float)
+    dscs = np.zeros(cluster_ids.size, dtype=float)
 
     # DSPC: 'Density Separation of a Pair of Clusters'
     min_dspcs = np.full(cluster_ids.size, fill_value=np.inf)
