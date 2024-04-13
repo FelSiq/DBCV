@@ -40,10 +40,11 @@ def get_subarray(
 def get_internal_objects(mutual_reach_dists: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
     mst = scipy.sparse.csgraph.minimum_spanning_tree(mutual_reach_dists)
     mst = mst.toarray()
+    mst += mst.T
 
     is_mst_edges = (mst > 0.0).astype(int, copy=False)
 
-    internal_node_inds = (is_mst_edges + is_mst_edges.T).sum(axis=0) > 1
+    internal_node_inds = is_mst_edges.sum(axis=0) > 1
     internal_node_inds = np.flatnonzero(internal_node_inds)
 
     internal_edge_weights = get_subarray(mst, inds_a=internal_node_inds)
