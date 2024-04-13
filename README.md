@@ -42,7 +42,7 @@ X, y = sklearn.datasets.make_moons(n_samples=300, noise=0.05, random_state=1782)
 
 score = dbcv.dbcv(X, y)
 print(score)
-# 0.978017974682571
+# 0.8545358723390613
 ```
 
 ### Example with noise "cluster"
@@ -52,7 +52,7 @@ import sklearn.datasets
 import numpy as np
 import dbcv
 
-X, y = sklearn.datasets.make_moons(n_samples=500, noise=0.10, random_state=1782)
+X, y = sklearn.datasets.make_moons(n_samples=500, noise=0.05, random_state=1782)
 
 noise_id = -1  # NOTE: dbcv.dbcv(..., noise_id=-1) by default.
 
@@ -64,7 +64,7 @@ X, y = np.vstack((X, X_noise)), np.hstack((y, y_noise))
 
 score = dbcv.dbcv(X, y, noise_id=noise_id)
 print(score)
-# 0.8072520501068048
+# 0.7545431212217051
 ```
 
 ### Multiprocessing
@@ -79,7 +79,7 @@ X, y = sklearn.datasets.make_moons(n_samples=300, noise=0.05, random_state=1782)
 
 score = dbcv.dbcv(X, y, n_processes=2)
 print(score)
-# 0.978017974682571
+# 0.8545358723390613
 ```
 
 ### High precision computation
@@ -94,7 +94,7 @@ X, y = sklearn.datasets.make_moons(n_samples=300, noise=0.05, random_state=1782)
 
 score = dbcv.dbcv(X, y, enable_dynamic_precision=True, bits_of_precision=512)
 print(score)
-# 0.978017974682571
+# 0.8545358723390613
 ```
 
 Note that enabling this option makes the DBCV calculation much slower than the plain numpy/scipy version. However, this option may be necessary for computing DBCV in high dimensions, since density calculations easily underflow under that circumstance. The table below displays runtimes from computing DBCV on an dataset of shape (10,000, 784) twenty times in a row for variable amount of precision bits and for dynamic precision disabled.
