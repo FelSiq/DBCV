@@ -78,29 +78,12 @@ def compute_mutual_reach_dists(
     dists: npt.NDArray[np.float64],
     d: float,
     enable_dynamic_precision: bool,
-    is_symmetric: bool,
-    cls_inds_a: t.Optional[npt.NDArray[np.int32]] = None,
-    cls_inds_b: t.Optional[npt.NDArray[np.int32]] = None,
 ) -> npt.NDArray[np.float64]:
-    cls_dists = get_subarray(dists, inds_a=cls_inds_a, inds_b=cls_inds_b)
-
-    if is_symmetric:
-        core_dists_a = core_dists_b = compute_cluster_core_distance(
-            d=d, dists=cls_dists, enable_dynamic_precision=enable_dynamic_precision
-        )
-        core_dists_b = core_dists_b.T
-
-    else:
-        core_dists_a = compute_cluster_core_distance(d=d, dists=cls_dists, enable_dynamic_precision=enable_dynamic_precision)
-        core_dists_b = compute_cluster_core_distance(
-            d=d, dists=cls_dists.T, enable_dynamic_precision=enable_dynamic_precision
-        ).T
-
-    mutual_reach_dists = cls_dists.copy()
-    np.maximum(mutual_reach_dists, core_dists_a, out=mutual_reach_dists)
-    np.maximum(mutual_reach_dists, core_dists_b, out=mutual_reach_dists)
-
-    return mutual_reach_dists
+    core_dists = compute_cluster_core_distance(d=d, dists=dists, enable_dynamic_precision=enable_dynamic_precision)
+    mutual_reach_dists = dists.copy()
+    np.maximum(mutual_reach_dists, core_dists, out=mutual_reach_dists)
+    np.maximum(mutual_reach_dists, core_dists.T, out=mutual_reach_dists)
+    return (core_dists, mutual_reach_dists)
 
 
 def fn_density_sparseness(
@@ -108,28 +91,27 @@ def fn_density_sparseness(
     dists: npt.NDArray[np.float64],
     d: int,
     enable_dynamic_precision: bool,
-) -> tuple[float, npt.NDArray[np.int32]]:
-    if cls_inds.size <= 3:
-        return (0.0, np.empty(0, dtype=int))
-
-    mutual_reach_dists = compute_mutual_reach_dists(
-        dists=dists, d=d, is_symmetric=True, enable_dynamic_precision=enable_dynamic_precision
-    )
-    internal_node_inds, internal_edge_weights = get_internal_objects(mutual_reach_dists)
-
+    use_original_mst_implementation: bool,
+) -> tuple[float, npt.NDArray[np.float32], npt.NDArray[np.int32]]:
+    (core_dists, mutual_reach_dists) = compute_mutual_reach_dists(dists=dists, d=d, enable_dynamic_precision=enable_dynamic_precision)
+    internal_node_inds, internal_edge_weights = get_internal_objects(mutual_reach_dists, use_original_mst_implementation=use_original_mst_implementation)
     dsc = float(internal_edge_weights.max())
+    internal_core_dists = core_dists[internal_node_inds]
     internal_node_inds = cls_inds[internal_node_inds]
-
-    return (dsc, internal_node_inds)
+    return (dsc, internal_core_dists, internal_node_inds)
 
 
 def fn_density_separation(
-    cls_i: int, cls_j: int, dists: npt.NDArray[np.float64], d: int, enable_dynamic_precision: bool
+    cls_i: int,
+    cls_j: int,
+    dists: npt.NDArray[np.float64],
+    internal_core_dists_i: npt.NDArray[np.float64],
+    internal_core_dists_j: npt.NDArray[np.float64],
 ) -> tuple[int, int, float]:
-    mutual_reach_dists = compute_mutual_reach_dists(
-        dists=dists, d=d, is_symmetric=False, enable_dynamic_precision=enable_dynamic_precision
-    )
-    dspc_ij = float(mutual_reach_dists.min()) if mutual_reach_dists.size else np.inf
+    sep = dists.copy()
+    np.maximum(sep, internal_core_dists_i, out=sep)
+    np.maximum(sep, internal_core_dists_j.T, out=sep)
+    dspc_ij = float(sep.min()) if sep.size else np.inf
     return (cls_i, cls_j, dspc_ij)
 
 
@@ -257,6 +239,9 @@ def dbcv(
     # Internal objects = Internal nodes = nodes such that degree(node) > 1 in MST.
     internal_objects_per_cls: dict[int, npt.NDArray[np.int32]] = {}
 
+    # internal core distances = core distances of internal nodes
+    internal_core_dists_per_cls: dict[int, npt.NDArray[np.float32]] = {}
+
     cls_inds = [np.flatnonzero(y == cls_id) for cls_id in cluster_ids]
 
     if n_processes == "auto":
@@ -271,26 +256,27 @@ def dbcv(
 
         args = [(cls_ind, get_subarray(dists, inds_a=cls_ind)) for cls_ind in cls_inds]
 
-        for cls_id, (dsc, internal_node_inds) in enumerate(ppool.starmap(fn_density_sparseness_, args)):
+        for cls_id, (dsc, internal_core_dists, internal_node_inds) in enumerate(ppool.starmap(fn_density_sparseness_, args)):
             internal_objects_per_cls[cls_id] = internal_node_inds
+            internal_core_dists_per_cls[cls_id] = internal_core_dists
             dscs[cls_id] = dsc
 
     n_cls_pairs = (cluster_ids.size * (cluster_ids.size - 1)) // 2
 
     if n_cls_pairs > 0:
         with _MP.workprec(bits_of_precision), multiprocessing.Pool(processes=min(n_processes, n_cls_pairs)) as ppool:
-            fn_density_separation_ = functools.partial(
-                fn_density_separation,
-                d=d,
-                enable_dynamic_precision=enable_dynamic_precision,
-            )
-
             args = [
-                (cls_i, cls_j, get_subarray(dists, internal_objects_per_cls[cls_i], internal_objects_per_cls[cls_j]))
+                (
+                    cls_i,
+                    cls_j,
+                    get_subarray(dists, inds_a=internal_objects_per_cls[cls_i], inds_b=internal_objects_per_cls[cls_j]),
+                    internal_core_dists_per_cls[cls_i],
+                    internal_core_dists_per_cls[cls_j],
+                )
                 for cls_i, cls_j in itertools.combinations(cluster_ids, 2)
             ]
 
-            for cls_i, cls_j, dspc_ij in ppool.starmap(fn_density_separation_, args):
+            for cls_i, cls_j, dspc_ij in ppool.starmap(fn_density_separation, args):
                 min_dspcs[cls_i] = min(min_dspcs[cls_i], dspc_ij)
                 min_dspcs[cls_j] = min(min_dspcs[cls_j], dspc_ij)
 
