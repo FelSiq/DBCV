@@ -18,6 +18,7 @@ _MP = mpmath.mp.clone()
 def compute_pair_to_pair_dists(X: npt.NDArray[np.float64], metric: str) -> npt.NDArray[np.float64]:
     dists = scipy.spatial.distance.cdist(X, X, metric=metric)
     np.maximum(dists, 1e-12, out=dists)
+    # NOTE: set self-distance to +inf to prevent points being self-neighbors.
     np.fill_diagonal(dists, val=np.inf)
     return dists
 
