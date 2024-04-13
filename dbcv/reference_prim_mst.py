@@ -10,7 +10,7 @@ def prim_mst(graph: npt.NDArray[np.float32], ind_root: int = 0) -> npt.NDArray[n
     n = len(graph)
     intree = np.full(n, fill_value=False)
     d = np.full(n, fill_value=np.inf)
-    
+
     d[ind_root] = 0
     v = ind_root
     counter = 0
@@ -23,7 +23,7 @@ def prim_mst(graph: npt.NDArray[np.float32], ind_root: int = 0) -> npt.NDArray[n
         "MST_degrees": np.zeros(n, dtype=int),
         "MST_parent": np.arange(n),
     }
-    
+
     while counter < n - 1:
         intree[v] = True
         dist = np.inf
