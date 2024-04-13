@@ -160,7 +160,7 @@ def dbcv(
     """Compute DBCV metric.
 
     Density-Based Clustering Validation (DBCV) is an intrinsic (= unsupervised/unlabeled)
-    relative metric. See [1] for the original reference.
+    relative metric. See reference [1] for the original reference.
 
     Parameters
     ----------
@@ -171,16 +171,19 @@ def dbcv(
         Cluster IDs assigned for each sample in X.
 
     metric : str, default="sqeuclidean"
-        Metric function to compute dissimilarity between observations.
+        This parameter specifies the metric function to compute dissimilarities between observations.
+        The DBCV metric estimation may vary depending on the distance metric used.
         This argument is passed to `scipy.spatial.distance.cdist`.
+        The default value is the squared Euclidean distance, which is also employed in the original
+        MATLAB implementation (see reference [2]).
 
     noise_id : int, default=-1
-        Noise "cluster" ID. Instances such that `y[i] = noise_id` will be considered noise.
-        Also, singleton clusters (clusters containing a single instance) are automatically casted
-        as noise.
+        The noise "cluster" ID refers to instances where `y[i] = noise_id`, which are considered noise.
+        Additionally, singleton clusters, meaning clusters containing only a single instance, are automatically
+        classified as noise.
 
     check_duplicates : bool, default=True
-        If True, check for duplicated samples.
+        If set to True, check for duplicated samples before execution.
         Instances with Euclidean distance to their nearest neighbor below 1e-9 are considered
         duplicates.
 
@@ -190,14 +193,23 @@ def dbcv(
         datasets with 200 or fewer instances, and 4 for datasets with more than 200 instances.
 
     enable_dynamic_precision : bool, default=False
-        If True, activate dynamic quantity of bits of precision for floating point
-        during density calculation, as defined by `bits_of_precision` argument below.
-        This argument enables proper density calculation for very high dimensional data,
-        although it is much slower than the standard calculations.
+        If set to True, this activates a dynamic quantity of bits of precision for floating point during
+        density calculation, as defined by the `bits_of_precision` argument below. Enabling this argument
+        ensures proper density calculation for very high-dimensional data, although it significantly slows
+        down the process compared to standard calculations.
 
     bits_of_precision : int, default=512
         Bits of precision for density calculation. High values are necessary for high
         dimensions to avoid underflow/overflow.
+
+    use_original_mst_implementation : bool, default=False
+        If set to False, the function will use Scipy's MST implementation (Kruskal's implementation).
+        If set to True, the function will use an exact replica of the original MATLAB implementation.
+        This version is a variant of Prim's MST algorithm.
+        The original implementation is slower than Scipy's implementation and tends to create hub nodes
+        much more often.
+        Since these implementations are not equivalent, the DBCV metric estimation tends to vary depending
+        on the MST algorithm used.
 
     Returns
     -------
@@ -209,6 +221,7 @@ def dbcv(
     .. [1] "Density-Based Clustering Validation". Davoud Moulavi, Pablo A. Jaskowiak,
            Ricardo J. G. B. Campello, Arthur Zimek, Jörg Sander.
            https://www.dbs.ifi.lmu.de/~zimek/publications/SDM2014/DBCV.pdf
+    .. [2] https://github.com/pajaskowiak/dbcv/
     """
     X = np.asfarray(X)
 
