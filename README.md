@@ -34,6 +34,13 @@ python -m pip install "git+https://github.com/FelSiq/DBCV"
 
 ### Basic usage
 
+<table>
+<tr>
+<td>
+<img src="./assets/example_basic_usage.png" alt="Basic usage example." width="400px"/>
+</td>
+<td>
+
 ```python
 import dbcv
 import sklearn.datasets
@@ -45,7 +52,20 @@ print(score)
 # 0.8545358723390613
 ```
 
+</td>
+</tr>
+</table>
+
 ### Example with noise "cluster"
+
+The DBCV metric naturally supports clustering configurations where some instances have not been clustered and are considered noise. By default, all instances with the cluster ID of -1 are considered noise (you can replace this ID with a custom value), as demonstrated in the example below.
+
+<table>
+<tr>
+<td>
+<img src="./assets/example_noise_cluster.png" alt="Basic usage example with random noise." width="400px"/>
+</td>
+<td>
 
 ```python
 import sklearn.datasets
@@ -66,6 +86,10 @@ score = dbcv.dbcv(X, y, noise_id=noise_id)
 print(score)
 # 0.7545431212217051
 ```
+
+</td>
+</tr>
+</table>
 
 ### Multiprocessing
 
