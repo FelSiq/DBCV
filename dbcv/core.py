@@ -11,6 +11,8 @@ import scipy.sparse.csgraph
 import scipy.stats
 import mpmath
 
+from . import reference_prim_mst
+
 
 _MP = mpmath.mp.clone()
 
@@ -37,10 +39,16 @@ def get_subarray(
     return arr[inds_a_mesh, inds_b_mesh].T
 
 
-def get_internal_objects(mutual_reach_dists: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
-    mst = scipy.sparse.csgraph.minimum_spanning_tree(mutual_reach_dists)
-    mst = mst.toarray()
-    mst += mst.T
+def get_internal_objects(mutual_reach_dists: npt.NDArray[np.float64], use_original_mst_implementation: bool) -> npt.NDArray[np.float64]:
+    if use_original_mst_implementation:
+        mutual_reach_dists = np.copy(mutual_reach_dists)
+        np.fill_diagonal(mutual_reach_dists, 0.0)
+        mst = reference_prim_mst.prim_mst(mutual_reach_dists)
+
+    else:
+        mst = scipy.sparse.csgraph.minimum_spanning_tree(mutual_reach_dists)
+        mst = mst.toarray()
+        mst += mst.T
 
     is_mst_edges = (mst > 0.0).astype(int, copy=False)
 
@@ -147,6 +155,7 @@ def dbcv(
     n_processes: int = 4,
     enable_dynamic_precision: bool = False,
     bits_of_precision: int = 512,
+    use_original_mst_implementation: bool = False,
 ) -> float:
     """Compute DBCV metric.
 
@@ -252,6 +261,7 @@ def dbcv(
             fn_density_sparseness,
             d=d,
             enable_dynamic_precision=enable_dynamic_precision,
+            use_original_mst_implementation=use_original_mst_implementation,
         )
 
         args = [(cls_ind, get_subarray(dists, inds_a=cls_ind)) for cls_ind in cls_inds]
