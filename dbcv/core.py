@@ -145,6 +145,17 @@ def _check_duplicated_samples(X: npt.NDArray[np.float64], threshold: float = 1e-
         raise ValueError("Duplicated samples have been found in X.")
 
 
+def _convert_singleton_clusters_to_noise(y: npt.NDArray[np.int32], noise_id: int) -> npt.NDArray[np.int32]:
+    """Cast clusters containing a single instance as noise."""
+    cluster_ids, cluster_sizes = np.unique(y, return_counts=True)
+    singleton_clusters = cluster_ids[cluster_sizes == 1]
+
+    if singleton_clusters.size == 0:
+        return y
+
+    return np.where(np.isin(y, singleton_clusters), noise_id, y)
+
+
 def dbcv(
     X: npt.NDArray[np.float64],
     y: npt.NDArray[np.int32],
@@ -173,7 +184,9 @@ def dbcv(
         This argument is passed to `scipy.spatial.distance.cdist`.
 
     noise_id : int, default=-1
-        Noise "cluster" ID.
+        Noise "cluster" ID. Instances such that `y[i] = noise_id` will be considered noise.
+        Also, singleton clusters (clusters containing a single instance) are automatically casted
+        as noise.
 
     check_duplicates : bool, default=True
         If True, check for duplicated samples.
@@ -217,6 +230,8 @@ def dbcv(
 
     if n != y.size:
         raise ValueError(f"Mismatch in {X.shape[0]=} and {y.size=} dimensions.")
+
+    y = _convert_singleton_clusters_to_noise(y, noise_id=noise_id)
 
     non_noise_inds = y != noise_id
     X = X[non_noise_inds, :]
