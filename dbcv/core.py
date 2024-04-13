@@ -55,22 +55,16 @@ def get_internal_objects(mutual_reach_dists: npt.NDArray[np.float64]) -> npt.NDA
 def compute_cluster_core_distance(
     dists: npt.NDArray[np.float64], d: int, enable_dynamic_precision: bool
 ) -> npt.NDArray[np.float64]:
-    n, m = dists.shape
-
-    if n == m and n > 800:
-        nn = sklearn.neighbors.NearestNeighbors(n_neighbors=801, metric="precomputed")
-        dists, _ = nn.fit(np.nan_to_num(dists, posinf=0.0)).kneighbors(return_distance=True)
-        n = dists.shape[1]
-
+    n, _ = dists.shape
     orig_dists_dtype = dists.dtype
 
     if enable_dynamic_precision:
         dists = np.asarray(_MP.matrix(dists), dtype=object).reshape(*dists.shape)
 
-    core_dists = np.power(dists, -d).sum(axis=-1, keepdims=True) / (n - 1 + 1e-12)
+    core_dists = np.power(dists, -d).sum(axis=-1, keepdims=True) / (n - 1)
 
     if not enable_dynamic_precision:
-        np.clip(core_dists, a_min=1e-12, a_max=1e12, out=core_dists)
+        np.clip(core_dists, a_min=0.0, a_max=1e12, out=core_dists)
 
     np.power(core_dists, -1.0 / d, out=core_dists)
 
