@@ -1,10 +1,10 @@
 # Fast Density-Based Clustering Validation (DBCV)
 
-Fast Density-Based Clustering Validation (DBCV) implementation for Python, with suppport for parallel and dynamically-adjustable high precision computation.
+Fast Density-Based Clustering Validation (DBCV) implementation for Python, with support for parallel and dynamically-adjustable high precision computation.
 
 Fully compatible with the original MATLAB implementation available in [https://github.com/pajaskowiak/dbcv/](https://github.com/pajaskowiak/dbcv/).
 
-*NOTE:* See below for instructions on how to ensure equivalent results.
+*NOTE:* See below for instructions on how to ensure equivalent results to the MATLAB implementation if strictly required in your application.
 
 ![Moon with noise example.](./assets/example_moons_with_noise.png)
 
