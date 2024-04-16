@@ -148,6 +148,15 @@ X, y = ...
 score = dbcv.dbcv(X, y, metric="sqeuclidean", noise_id=0, use_original_mst_implementation=True)
 ```
 
+For reference, the Table below exhibits a comparison between the results estimated by this Python implementation (using both MST algorithm implementations) and the original MATLAB code. The datasets are available in the [MATLAB GitHub repository](https://github.com/pajaskowiak/dbcv/tree/main/data).
+
+Dataset | Python (Scipy's Kruskal's) | Python (Translated MST algorithm) | MATLAB |
+:-- | --: | --: | --:
+`dataset_1.txt` | 0.8566 | 0.8576 | 0.8576 |
+`dataset_2.txt` | 0.5405 | 0.8103 | 0.8103 |
+`dataset_3.txt` | 0.6308 | 0.6319 | 0.6319 |
+`dataset_4.txt` | 0.8456 | 0.8688 | 0.8688 |
+
 ---
 
 ## Reference
