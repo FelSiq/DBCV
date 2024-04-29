@@ -152,7 +152,7 @@ def dbcv(
     metric: str = "sqeuclidean",
     noise_id: int = -1,
     check_duplicates: bool = True,
-    n_processes: int = 4,
+    n_processes: t.Union[int, str] = "auto",
     enable_dynamic_precision: bool = False,
     bits_of_precision: int = 512,
     use_original_mst_implementation: bool = False,
@@ -190,7 +190,7 @@ def dbcv(
     n_processes : int or "auto", default="auto"
         Maximum number of parallel processes for processing clusters and cluster pairs.
         If `n_processes="auto"`, the number of parallel processes will be set to 1 for
-        datasets with 200 or fewer instances, and 4 for datasets with more than 200 instances.
+        datasets with 500 or fewer instances, and 4 for datasets with more than 500 instances.
 
     enable_dynamic_precision : bool, default=False
         If set to True, this activates a dynamic quantity of bits of precision for floating point during
@@ -267,7 +267,7 @@ def dbcv(
     cls_inds = [np.flatnonzero(y == cls_id) for cls_id in cluster_ids]
 
     if n_processes == "auto":
-        n_processes = 4 if y.size > 200 else 1
+        n_processes = 4 if y.size > 500 else 1
 
     with _MP.workprec(bits_of_precision), multiprocessing.Pool(processes=min(n_processes, cluster_ids.size)) as ppool:
         fn_density_sparseness_ = functools.partial(
