@@ -93,7 +93,7 @@ print(score)
 
 ### Multiprocessing
 
-You can use the `dbcv.dbcv(..., n_processes=n)` argument to specify the number of parallel processes during computations. The default value of `n_processes` is `"auto"`, which is equivalent to 1 for datasets with 200 or fewer instances, and 4 for datasets with more than 200 instances.
+You can use the `dbcv.dbcv(..., n_processes=n)` argument to specify the number of parallel processes during computations. The default value of `n_processes` is `"auto"`, which is equivalent to 1 for datasets with 500 or fewer instances, and 4 for datasets with more than 500 instances.
 
 ```python
 import dbcv
