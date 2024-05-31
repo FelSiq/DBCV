@@ -98,7 +98,7 @@ def fn_density_sparseness(
     d: int,
     enable_dynamic_precision: bool,
     use_original_mst_implementation: bool,
-) -> tuple[float, npt.NDArray[np.float32], npt.NDArray[np.int32]]:
+) -> t.Tuple[float, npt.NDArray[np.float32], npt.NDArray[np.int32]]:
     (core_dists, mutual_reach_dists) = compute_mutual_reach_dists(dists=dists, d=d, enable_dynamic_precision=enable_dynamic_precision)
     internal_node_inds, internal_edge_weights = get_internal_objects(
         mutual_reach_dists, use_original_mst_implementation=use_original_mst_implementation
@@ -115,7 +115,7 @@ def fn_density_separation(
     dists: npt.NDArray[np.float64],
     internal_core_dists_i: npt.NDArray[np.float64],
     internal_core_dists_j: npt.NDArray[np.float64],
-) -> tuple[int, int, float]:
+) -> t.Tuple[int, int, float]:
     sep = dists.copy()
     np.maximum(sep, internal_core_dists_i, out=sep)
     np.maximum(sep, internal_core_dists_j.T, out=sep)
