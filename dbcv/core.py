@@ -259,10 +259,10 @@ def dbcv(
     min_dspcs = np.full(cluster_ids.size, fill_value=np.inf)
 
     # Internal objects = Internal nodes = nodes such that degree(node) > 1 in MST.
-    internal_objects_per_cls: dict[int, npt.NDArray[np.int32]] = {}
+    internal_objects_per_cls: t.Dict[int, npt.NDArray[np.int32]] = {}
 
     # internal core distances = core distances of internal nodes
-    internal_core_dists_per_cls: dict[int, npt.NDArray[np.float32]] = {}
+    internal_core_dists_per_cls: t.Dict[int, npt.NDArray[np.float32]] = {}
 
     cls_inds = [np.flatnonzero(y == cls_id) for cls_id in cluster_ids]
 
