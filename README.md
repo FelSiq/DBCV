@@ -19,6 +19,7 @@ Fully compatible with the original MATLAB implementation available in [https://g
     4. [High precision computation](#high-precision-computation)
     5. [Ensuring equivalent results with the original MATLAB implementation](#ensuring-equivalent-results-with-the-original-matlab-implementation)
 3. [Reference](#reference)
+4. [License](#license)
 
 
 ---
@@ -162,3 +163,9 @@ Dataset | Python (Scipy's Kruskal's) | Python (Translated MST algorithm) | MATLA
 ## Reference
 1. Moulavi, Davoud & Andretta Jaskowiak, Pablo & Campello, Ricardo & Zimek, Arthur & Sander, Joerg. (2014). Density-Based Clustering Validation. 10.1137/1.9781611973440.96.
 2. [https://github.com/pajaskowiak/dbcv/](https://github.com/pajaskowiak/dbcv/)
+
+---
+
+## License
+
+[MIT](./LICENSE).
