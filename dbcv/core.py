@@ -223,7 +223,7 @@ def dbcv(
            https://www.dbs.ifi.lmu.de/~zimek/publications/SDM2014/DBCV.pdf
     .. [2] https://github.com/pajaskowiak/dbcv/
     """
-    X = np.asfarray(X)
+    X = np.asarray(X, dtype=np.float64)
 
     if X.ndim == 1:
         X = X.reshape(-1, 1)
