@@ -17,7 +17,9 @@ from . import reference_prim_mst
 _MP = mpmath.mp.clone()
 
 
-def compute_pair_to_pair_dists(X: npt.NDArray[np.float64], metric: str) -> npt.NDArray[np.float64]:
+def compute_pair_to_pair_dists(
+    X: npt.NDArray[np.float64], metric: str
+) -> npt.NDArray[np.float64]:
     dists = scipy.spatial.distance.cdist(X, X, metric=metric)
     np.maximum(dists, 1e-12, out=dists)
     # NOTE: set self-distance to +inf to prevent points being self-neighbors.
@@ -59,12 +61,17 @@ def get_internal_objects(
 
     internal_edge_weights = get_subarray(mst, inds_a=internal_node_inds)
 
-    if internal_node_inds.size == 0:
-        # NOTE: edge casa, where all nodes are external.
-        all_inds = np.arange(mutual_reach_dists.shape[0])
-        return (all_inds, mst)
+    graph_has_internal_nodes = bool(internal_node_inds.size > 0)
+    graph_has_at_least_two_internal_nodes = bool(internal_edge_weights.size > 1)
 
-    return (internal_node_inds, internal_edge_weights)
+    return (
+        (
+            internal_node_inds
+            if graph_has_internal_nodes
+            else np.arange(mutual_reach_dists.shape[0])
+        ),
+        internal_edge_weights if graph_has_at_least_two_internal_nodes else mst,
+    )
 
 
 def compute_cluster_core_distance(
@@ -94,7 +101,9 @@ def compute_mutual_reach_dists(
     d: float,
     enable_dynamic_precision: bool,
 ) -> npt.NDArray[np.float64]:
-    core_dists = compute_cluster_core_distance(d=d, dists=dists, enable_dynamic_precision=enable_dynamic_precision)
+    core_dists = compute_cluster_core_distance(
+        d=d, dists=dists, enable_dynamic_precision=enable_dynamic_precision
+    )
     mutual_reach_dists = dists.copy()
     np.maximum(mutual_reach_dists, core_dists, out=mutual_reach_dists)
     np.maximum(mutual_reach_dists, core_dists.T, out=mutual_reach_dists)
@@ -112,7 +121,8 @@ def fn_density_sparseness(
         dists=dists, d=d, enable_dynamic_precision=enable_dynamic_precision
     )
     (internal_node_inds, internal_edge_weights) = get_internal_objects(
-        mutual_reach_dists, use_original_mst_implementation=use_original_mst_implementation
+        mutual_reach_dists,
+        use_original_mst_implementation=use_original_mst_implementation,
     )
     dsc = float(internal_edge_weights.max())
     internal_core_dists = core_dists[internal_node_inds]
@@ -146,7 +156,9 @@ def _check_duplicated_samples(X: npt.NDArray[np.float64], threshold: float = 1e-
         raise ValueError("Duplicated samples have been found in X.")
 
 
-def _convert_singleton_clusters_to_noise(y: npt.NDArray[np.int32], noise_id: int) -> npt.NDArray[np.int32]:
+def _convert_singleton_clusters_to_noise(
+    y: npt.NDArray[np.int32], noise_id: int
+) -> npt.NDArray[np.int32]:
     """Cast clusters containing a single instance as noise."""
     cluster_ids, cluster_sizes = np.unique(y, return_counts=True)
     singleton_clusters = cluster_ids[cluster_sizes == 1]
@@ -280,7 +292,9 @@ def dbcv(
     if n_processes == "auto":
         n_processes = 4 if y.size > 500 else 1
 
-    with _MP.workprec(bits_of_precision), multiprocessing.Pool(processes=min(n_processes, cluster_ids.size)) as ppool:
+    with _MP.workprec(bits_of_precision), multiprocessing.Pool(
+        processes=min(n_processes, cluster_ids.size)
+    ) as ppool:
         fn_density_sparseness_ = functools.partial(
             fn_density_sparseness,
             d=d,
@@ -290,7 +304,9 @@ def dbcv(
 
         args = [(cls_ind, get_subarray(dists, inds_a=cls_ind)) for cls_ind in cls_inds]
 
-        for cls_id, (dsc, internal_core_dists, internal_node_inds) in enumerate(ppool.starmap(fn_density_sparseness_, args)):
+        for cls_id, (dsc, internal_core_dists, internal_node_inds) in enumerate(
+            ppool.starmap(fn_density_sparseness_, args)
+        ):
             internal_objects_per_cls[cls_id] = internal_node_inds
             internal_core_dists_per_cls[cls_id] = internal_core_dists
             dscs[cls_id] = dsc
@@ -298,12 +314,18 @@ def dbcv(
     n_cls_pairs = (cluster_ids.size * (cluster_ids.size - 1)) // 2
 
     if n_cls_pairs > 0:
-        with _MP.workprec(bits_of_precision), multiprocessing.Pool(processes=min(n_processes, n_cls_pairs)) as ppool:
+        with _MP.workprec(bits_of_precision), multiprocessing.Pool(
+            processes=min(n_processes, n_cls_pairs)
+        ) as ppool:
             args = [
                 (
                     cls_i,
                     cls_j,
-                    get_subarray(dists, inds_a=internal_objects_per_cls[cls_i], inds_b=internal_objects_per_cls[cls_j]),
+                    get_subarray(
+                        dists,
+                        inds_a=internal_objects_per_cls[cls_i],
+                        inds_b=internal_objects_per_cls[cls_j],
+                    ),
                     internal_core_dists_per_cls[cls_i],
                     internal_core_dists_per_cls[cls_j],
                 )
