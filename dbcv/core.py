@@ -39,7 +39,9 @@ def get_subarray(
     return arr[inds_a_mesh, inds_b_mesh].T
 
 
-def get_internal_objects(mutual_reach_dists: npt.NDArray[np.float64], use_original_mst_implementation: bool) -> npt.NDArray[np.float64]:
+def get_internal_objects(
+    mutual_reach_dists: npt.NDArray[np.float64], use_original_mst_implementation: bool
+) -> npt.NDArray[np.float64]:
     if use_original_mst_implementation:
         mutual_reach_dists = np.copy(mutual_reach_dists)
         np.fill_diagonal(mutual_reach_dists, 0.0)
@@ -65,7 +67,9 @@ def get_internal_objects(mutual_reach_dists: npt.NDArray[np.float64], use_origin
     return (internal_node_inds, internal_edge_weights)
 
 
-def compute_cluster_core_distance(dists: npt.NDArray[np.float64], d: int, enable_dynamic_precision: bool) -> npt.NDArray[np.float64]:
+def compute_cluster_core_distance(
+    dists: npt.NDArray[np.float64], d: int, enable_dynamic_precision: bool
+) -> npt.NDArray[np.float64]:
     n, _ = dists.shape
     orig_dists_dtype = dists.dtype
 
@@ -104,7 +108,9 @@ def fn_density_sparseness(
     enable_dynamic_precision: bool,
     use_original_mst_implementation: bool,
 ) -> t.Tuple[float, npt.NDArray[np.float32], npt.NDArray[np.int32]]:
-    (core_dists, mutual_reach_dists) = compute_mutual_reach_dists(dists=dists, d=d, enable_dynamic_precision=enable_dynamic_precision)
+    (core_dists, mutual_reach_dists) = compute_mutual_reach_dists(
+        dists=dists, d=d, enable_dynamic_precision=enable_dynamic_precision
+    )
     (internal_node_inds, internal_edge_weights) = get_internal_objects(
         mutual_reach_dists, use_original_mst_implementation=use_original_mst_implementation
     )

@@ -2,6 +2,7 @@
 
 Reference source: https://github.com/pajaskowiak/dbcv/blob/main/src/MST_Edges.m
 """
+
 import numpy as np
 import numpy.typing as npt
 
