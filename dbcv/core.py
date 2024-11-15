@@ -57,7 +57,12 @@ def get_internal_objects(mutual_reach_dists: npt.NDArray[np.float64], use_origin
 
     internal_edge_weights = get_subarray(mst, inds_a=internal_node_inds)
 
-    return internal_node_inds, internal_edge_weights
+    if internal_node_inds.size == 0:
+        # NOTE: edge casa, where all nodes are external.
+        all_inds = np.arange(mutual_reach_dists.shape[0])
+        return (all_inds, mst)
+
+    return (internal_node_inds, internal_edge_weights)
 
 
 def compute_cluster_core_distance(dists: npt.NDArray[np.float64], d: int, enable_dynamic_precision: bool) -> npt.NDArray[np.float64]:
@@ -100,7 +105,7 @@ def fn_density_sparseness(
     use_original_mst_implementation: bool,
 ) -> t.Tuple[float, npt.NDArray[np.float32], npt.NDArray[np.int32]]:
     (core_dists, mutual_reach_dists) = compute_mutual_reach_dists(dists=dists, d=d, enable_dynamic_precision=enable_dynamic_precision)
-    internal_node_inds, internal_edge_weights = get_internal_objects(
+    (internal_node_inds, internal_edge_weights) = get_internal_objects(
         mutual_reach_dists, use_original_mst_implementation=use_original_mst_implementation
     )
     dsc = float(internal_edge_weights.max())
