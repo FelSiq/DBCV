@@ -7,7 +7,9 @@ import numpy as np
 import numpy.typing as npt
 
 
-def prim_mst(graph: npt.NDArray[np.float32], ind_root: int = 0) -> npt.NDArray[np.float32]:
+def prim_mst(
+    graph: npt.NDArray[np.float32], ind_root: int = 0
+) -> npt.NDArray[np.float32]:
     n = len(graph)
     intree = np.full(n, fill_value=False)
     d = np.full(n, fill_value=np.inf)
