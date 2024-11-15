@@ -84,7 +84,7 @@ def compute_cluster_core_distance(
     np.power(core_dists, -1.0 / d, out=core_dists)
 
     if enable_dynamic_precision:
-        core_dists = np.asfarray(core_dists, dtype=orig_dists_dtype)
+        core_dists = np.asarray(core_dists, dtype=orig_dists_dtype)
 
     return core_dists
 
