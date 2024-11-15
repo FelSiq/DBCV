@@ -31,7 +31,12 @@ def test():
     print(f"Base: {np.mean(ts):.4f} \\pm {np.std(ts):.4f}")
 
     for bop in [64, 128, 256, 512, 1024]:
-        ts = timeit.repeat(functools.partial(run, enable_dynamic_precision=True, bits_of_precision=bop), **kwargs)
+        ts = timeit.repeat(
+            functools.partial(
+                run, enable_dynamic_precision=True, bits_of_precision=bop
+            ),
+            **kwargs,
+        )
         print(f"{bop}: {np.mean(ts):.4f} \\pm {np.std(ts):.4f}")
 
 
