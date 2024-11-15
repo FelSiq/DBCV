@@ -7,7 +7,7 @@ name = "dbcv"
 
 [project]
 name = "dbcv"
-version = "0.1.0"
+version = "0.1.1"
 description = "Fast implementation of DBCV metric."
 authors = [
     {name="felsiq", email= "felipe.siqueira@usp.br"}
